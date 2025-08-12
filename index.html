@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<title>旅行公帳系統（Firebase版）</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  h2 { color: #333; }
+  input, button { padding: 5px; margin: 3px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+  th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+  th { background-color: #f5f5f5; }
+  #balance { font-size: 1.5em; color: green; margin: 10px 0; }
+</style>
+</head>
+<body>
+
+<h2>旅行公帳系統（Firebase版）</h2>
+
+<!-- 公帳收入 -->
+<div>
+  <h3>新增 公帳收入</h3>
+  <input type="number" id="income" placeholder="金額">
+  <button id="addIncomeBtn">新增收入</button>
+</div>
+
+<!-- 顯示剩餘金額 -->
+<div id="balance">剩餘金額：0 元</div>
+
+<hr>
+
+<!-- 花費紀錄 -->
+<div>
+  <h3>新增花費</h3>
+  <input type="text" id="desc" placeholder="用途">
+  <input type="number" id="amount" placeholder="金額">
+  <button id="addExpenseBtn">新增花費</button>
+</div>
+
+<!-- 紀錄表 -->
+<table>
+  <thead>
+    <tr>
+      <th>類型</th>
+      <th>金額</th>
+      <th>用途</th>
+      <th>操作</th>
+    </tr>
+  </thead>
+  <tbody id="recordsTable"></tbody>
+</table>
+
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+
+<script>
+  // 請改成你的 Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyChzgS_IFOevrenqUL0oecU9BS-GZg0QvE",
+    authDomain: "osaka-3ed9a.firebaseapp.com",
+    databaseURL: "https://osaka-3ed9a-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "osaka-3ed9a",
+    storageBucket: "osaka-3ed9a.firebasestorage.app",
+    messagingSenderId: "217169641602",
+    appId: "1:217169641602:web:86253f954ba5506e8f749b"
+  };
+
+  const app = firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const incomeInput = document.getElementById('income');
+  const addIncomeBtn = document.getElementById('addIncomeBtn');
+  const balanceDisplay = document.getElementById('balance');
+  const descInput = document.getElementById('desc');
+  const amountInput = document.getElementById('amount');
+  const addExpenseBtn = document.getElementById('addExpenseBtn');
+  const recordsTable = document.getElementById('recordsTable');
+
+  // 監聽新增收入
+  addIncomeBtn.addEventListener('click', () => {
+    const amount = parseFloat(incomeInput.value);
+    if (isNaN(amount) || amount <= 0) {
+      alert('金額需大於 0');
+      return;
+    }
+    // 新增收入記錄，status 預設為 approved
+    db.ref('records').push({
+      type: 'income',
+      amount,
+      desc: '公帳收入'
+    });
+    incomeInput.value = '';
+  });
+
+  // 監聽新增花費
+  addExpenseBtn.addEventListener('click', () => {
+    const amount = parseFloat(amountInput.value);
+    const desc = descInput.value.trim();
+    if (!desc) {
+      alert('請輸入用途');
+      return;
+    }
+    if (isNaN(amount) || amount <= 0) {
+      alert('金額需大於 0');
+      return;
+    }
+    // 先檢查剩餘金額夠不夠
+    db.ref('balance').once('value').then(snapshot => {
+      const currentBalance = snapshot.val() || 0;
+      if (amount > currentBalance) {
+        alert('剩餘金額不足');
+        return;
+      }
+      // 新增花費記錄
+      db.ref('records').push({
+        type: 'expense',
+        amount,
+        desc
+      });
+      amountInput.value = '';
+      descInput.value = '';
+    });
+  });
+
+  // 監聽資料更新，更新剩餘金額和紀錄列表
+  db.ref('records').on('value', snapshot => {
+    const records = snapshot.val() || {};
+    // 計算剩餘金額
+    let balance = 0;
+    for (const id in records) {
+      const r = records[id];
+      if (r.type === 'income') balance += r.amount;
+      else if (r.type === 'expense') balance -= r.amount;
+    }
+    balanceDisplay.textContent = `剩餘金額：${balance.toFixed(2)} 元`;
+
+    // 顯示紀錄
+    let html = '';
+    for (const id in records) {
+      const r = records[id];
+      html += `
+        <tr>
+          <td>${r.type === 'income' ? '收入' : '花費'}</td>
+          <td>${r.amount}</td>
+          <td>${r.desc}</td>
+          <td><button onclick="deleteRecord('${id}', '${r.type}', ${r.amount})">刪除</button></td>
+        </tr>
+      `;
+    }
+    recordsTable.innerHTML = html;
+  });
+
+  // 刪除紀錄函式
+  function deleteRecord(id, type, amount) {
+    if (!confirm('確定刪除該筆紀錄嗎？')) return;
+    db.ref('records/' + id).remove();
+  }
+
+  window.deleteRecord = deleteRecord;
+</script>
+
+</body>
+</html>
+

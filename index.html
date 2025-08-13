@@ -4,71 +4,76 @@
 <meta charset="UTF-8">
 <title>旅行公數系統</title>
 <style>
-  body { 
-    font-family: Arial, sans-serif; 
-    margin: 10px; 
-    background: #f9f9f9;
+  :root {
+    --primary-color: #4CAF50;
+    --primary-hover: #45a049;
+    --danger-color: #e74c3c;
+    --bg-light: #f9f9f9;
+    --border-color: #ccc;
+    --table-border: #ddd;
   }
-  h2 { 
-    color: #333; 
-    text-align: center;
-    font-size: 1.6em;
-    margin-bottom: 10px;
+  body {
+    font-family: Arial, sans-serif;
+    margin: 10px auto;
+    max-width: 600px;
+    background: var(--bg-light);
   }
-  h3 {
-    font-size: 1.2em;
-    margin-top: 15px;
-    color: #555;
-  }
+  h2, h3 { text-align: center; margin: 10px 0; }
+  h2 { color: #333; font-size: 1.6em; }
+  h3 { font-size: 1.2em; color: #555; }
+
   input, button {
-    padding: 10px; 
+    padding: 12px;
     margin: 5px 0;
-    font-size: 1em;
+    font-size: 1.05em;
     border-radius: 8px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     width: 100%;
     box-sizing: border-box;
   }
   button {
-    background-color: #4CAF50; 
-    color: white; 
-    border: none; 
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
     cursor: pointer;
     font-weight: bold;
+    min-height: 48px;
   }
-  button:hover {
-    background-color: #45a049;
-  }
-  table { 
-    border-collapse: collapse; 
-    width: 100%; 
-    margin-top: 10px; 
-    background: white;
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  th, td { 
-    border: 1px solid #ddd; 
-    padding: 8px; 
-    text-align: center; 
-    font-size: 0.95em;
-  }
-  th { 
-    background-color: #f5f5f5; 
-    font-weight: bold;
-  }
-  #balance { 
-    font-size: 1.4em; 
-    color: green; 
-    margin: 15px 0; 
+  button:hover { background-color: var(--primary-hover); }
+  .btn-danger { background: var(--danger-color); }
+
+  #balance {
+    font-size: 1.4em;
+    color: green;
+    margin: 15px 0;
     text-align: center;
     font-weight: bold;
   }
-  /* 手機適配 */
-  @media (max-width: 600px) {
+
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    background: white;
+    min-width: 500px;
+  }
+  th, td {
+    border: 1px solid var(--table-border);
+    padding: 10px;
+    text-align: center;
+    font-size: 0.95em;
+  }
+  th { background-color: #f5f5f5; }
+
+  @media (max-width: 480px) {
     h2 { font-size: 1.4em; }
+    h3 { font-size: 1.1em; }
     input, button { font-size: 1em; }
-    th, td { font-size: 0.85em; }
+    th, td { font-size: 0.9em; padding: 8px; }
   }
 </style>
 </head>
@@ -76,40 +81,36 @@
 
 <h2>💰 旅行公數系統</h2>
 
-<!-- 新增收入 -->
-<div>
+<section>
   <h3>➕ 新增收入</h3>
   <input type="number" id="income" placeholder="💵 金額">
-  <button onclick="addIncome()">💰 新增收入</button>
-</div>
+  <button id="addIncomeBtn">💰 新增收入</button>
+</section>
 
-<!-- 顯示剩餘金額 -->
 <div id="balance">剩餘金額：0 元</div>
-
 <hr>
 
-<!-- 新增花費 -->
-<div>
+<section>
   <h3>💸 新增花費</h3>
   <input type="text" id="desc" placeholder="📄 用途">
   <input type="number" id="amount" placeholder="💵 金額">
-  <button onclick="addExpense()">💳 新增花費</button>
+  <button id="addExpenseBtn">💳 新增花費</button>
+</section>
+
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>📂 類型</th>
+        <th>💵 金額</th>
+        <th>📄 用途</th>
+        <th>⚙ 操作</th>
+      </tr>
+    </thead>
+    <tbody id="recordsTable"></tbody>
+  </table>
 </div>
 
-<!-- 紀錄表 -->
-<table>
-  <thead>
-    <tr>
-      <th>📂 類型</th>
-      <th>💵 金額</th>
-      <th>📄 用途</th>
-      <th>⚙ 操作</th>
-    </tr>
-  </thead>
-  <tbody id="recordsTable"></tbody>
-</table>
-
-<!-- Firebase -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
   import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
@@ -126,71 +127,67 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
-
   const recordsRef = ref(db, 'records');
 
-  function renderRecords(records) {
+  const incomeInput = document.getElementById('income');
+  const expenseAmountInput = document.getElementById('amount');
+  const expenseDescInput = document.getElementById('desc');
+  const recordsTable = document.getElementById('recordsTable');
+  const balanceEl = document.getElementById('balance');
+
+  const renderRecords = (records) => {
     let totalBalance = 0;
-    let html = '';
-    records.forEach(r => {
-      if (r.type === 'income') totalBalance += r.amount;
-      else totalBalance -= r.amount;
+    const rows = records.map(r => {
+      totalBalance += r.type === 'income' ? r.amount : -r.amount;
+      return `
+        <tr>
+          <td>${r.type === 'income' ? '💰 收入' : '💸 花費'}</td>
+          <td>${r.amount}</td>
+          <td>${r.desc}</td>
+          <td><button class="btn-danger" onclick="deleteRecord('${r.id}')">🗑 刪除</button></td>
+        </tr>`;
+    }).join('');
+    recordsTable.innerHTML = rows;
+    balanceEl.textContent = `💵 剩餘金額：${totalBalance.toFixed(2)} 元`;
+  };
 
-      html += `<tr>
-        <td>${r.type === 'income' ? '💰 收入' : '💸 花費'}</td>
-        <td>${r.amount}</td>
-        <td>${r.desc}</td>
-        <td><button style="background:#e74c3c" onclick="deleteRecord('${r.id}')">🗑 刪除</button></td>
-      </tr>`;
-    });
-    document.getElementById('recordsTable').innerHTML = html;
-    document.getElementById('balance').innerText = `💵 剩餘金額：${totalBalance.toFixed(2)} 元`;
-  }
-
-  // 即時監聽資料變化
   onValue(recordsRef, snapshot => {
     const data = snapshot.val() || {};
-    const records = Object.keys(data).map(id => ({
-      id,
-      ...data[id]
-    }));
+    const records = Object.keys(data).map(id => ({ id, ...data[id] }));
     renderRecords(records);
   });
 
-  window.addIncome = function() {
-    let amount = parseFloat(document.getElementById('income').value);
-    if (isNaN(amount) || amount <= 0) {
-      alert('金額需大於 0');
-      return;
-    }
-    push(recordsRef, { type: 'income', amount, desc: '公帳收入' });
-    document.getElementById('income').value = '';
+  const addRecord = (type, amount, desc) => {
+    push(recordsRef, { type, amount, desc });
   };
 
-  window.addExpense = function() {
-    let amount = parseFloat(document.getElementById('amount').value);
-    let desc = document.getElementById('desc').value.trim();
-    if (!desc) {
-      alert('請輸入用途');
-      return;
-    }
-    if (isNaN(amount) || amount <= 0) {
-      alert('金額需大於 0');
-      return;
-    }
-    push(recordsRef, { type: 'expense', amount, desc });
-    document.getElementById('amount').value = '';
-    document.getElementById('desc').value = '';
-  };
+  document.getElementById('addIncomeBtn').addEventListener('click', () => {
+    const amount = parseFloat(incomeInput.value);
+    if (isNaN(amount) || amount <= 0) return alert('金額需大於 0');
+    addRecord('income', amount, '公帳收入');
+    incomeInput.value = '';
+  });
 
-  window.deleteRecord = function(id) {
-    if (!confirm('確定要刪除此紀錄嗎？')) return;
-    remove(ref(db, 'records/' + id));
+  document.getElementById('addExpenseBtn').addEventListener('click', () => {
+    const amount = parseFloat(expenseAmountInput.value);
+    const desc = expenseDescInput.value.trim();
+    if (!desc) return alert('請輸入用途');
+    if (isNaN(amount) || amount <= 0) return alert('金額需大於 0');
+    addRecord('expense', amount, desc);
+    expenseAmountInput.value = '';
+    expenseDescInput.value = '';
+  });
+
+  window.deleteRecord = (id) => {
+    if (confirm('確定要刪除此紀錄嗎？')) {
+      remove(ref(db, 'records/' + id));
+    }
   };
 </script>
 
 </body>
 </html>
+
 
 
 
